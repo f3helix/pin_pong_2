@@ -20,7 +20,10 @@ class GameServer:
         self.connected = {0: False, 1: False}
         self.lock = threading.Lock()
         self.reset_game_state()
+
+        ### >>> ЗВУК: змінна для передачі подій <<< ###
         self.sound_event = None
+        ### >>> КІНЕЦЬ <<< ###
 
     def reset_game_state(self):
         self.paddles = {0: 250, 1: 250}
@@ -49,8 +52,7 @@ class GameServer:
             with self.lock:
                 self.connected[pid] = False
                 self.game_over = True
-                self.winner = 1 - pid  # інший гравець автоматично виграє
-                print(f"Гравець {pid} відключився. Переміг гравець {1 - pid}.")
+                self.winner = 1 - pid
 
     def broadcast_state(self):
         state = json.dumps({
@@ -59,8 +61,13 @@ class GameServer:
             "scores": self.scores,
             "countdown": max(self.countdown, 0),
             "winner": self.winner if self.game_over else None,
+
+            ### >>> ЗВУК: передаём событие звука <<< ###
             "sound_event": self.sound_event
+            ### >>> КІНЕЦЬ <<< ###
+
         }) + "\n"
+
         for pid, conn in self.clients.items():
             if conn:
                 try:
@@ -80,25 +87,43 @@ class GameServer:
                 self.ball['x'] += self.ball['vx']
                 self.ball['y'] += self.ball['vy']
 
+                # Відскок від стін
                 if self.ball['y'] <= 60 or self.ball['y'] >= HEIGHT:
                     self.ball['vy'] *= -1
-                    self.sound_event = "wall_hit"
 
+                    ### >>> ЗВУК <<< ###
+                    self.sound_event = "wall_hit"
+                    ### >>> КІНЕЦЬ <<< ###
+
+                # Відскок від ракетки
                 if (self.ball['x'] <= 40 and self.paddles[0] <= self.ball['y'] <= self.paddles[0] + 100) or \
                    (self.ball['x'] >= WIDTH - 40 and self.paddles[1] <= self.ball['y'] <= self.paddles[1] + 100):
                     self.ball['vx'] *= -1
-                    self.sound_event = 'platform_hit'
 
+                    ### >>> ЗВУК <<< ###
+                    self.sound_event = "platform_hit"
+                    ### >>> КІНЕЦЬ <<< ###
+
+                # ГОЛ
                 if self.ball['x'] < 0:
                     self.scores[1] += 1
-                    self.sound_event = 'score'
+
+                    ### >>> ЗВУК <<< ###
+                    self.sound_event = "score"
+                    ### >>> КІНЕЦЬ <<< ###
+
                     self.reset_ball()
 
                 elif self.ball['x'] > WIDTH:
                     self.scores[0] += 1
-                    self.sound_event = 'score'
+
+                    ### >>> ЗВУК <<< ###
+                    self.sound_event = "score"
+                    ### >>> КІНЕЦЬ <<< ###
+
                     self.reset_ball()
 
+                # Перемога
                 if self.scores[0] >= 10:
                     self.game_over = True
                     self.winner = 0
@@ -107,7 +132,11 @@ class GameServer:
                     self.winner = 1
 
                 self.broadcast_state()
+
+                ### >>> Обнулення події звуку після відправки <<< ###
                 self.sound_event = None
+                ### >>> КІНЕЦЬ <<< ###
+
             time.sleep(0.016)
 
     def reset_ball(self):
@@ -125,7 +154,6 @@ class GameServer:
             self.clients[pid] = conn
             conn.sendall((str(pid) + "\n").encode())
             self.connected[pid] = True
-            print(f"Гравець {pid} приєднався")
             threading.Thread(target=self.handle_client, args=(pid,), daemon=True).start()
 
     def run(self):
@@ -140,7 +168,6 @@ class GameServer:
             print(f"Гравець {self.winner} переміг!")
             time.sleep(5)
 
-            # Закриваємо старі з'єднання
             for pid in [0, 1]:
                 try:
                     self.clients[pid].close()
