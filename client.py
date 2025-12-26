@@ -27,7 +27,7 @@ def connect_to_server():
     while True:
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect(('localhost', 8080))
+            client.connect(('7.tcp.eu.ngrok.io', 18272))
             buffer = ""
             game_state = {}
             my_id = int(client.recv(24).decode())
